@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/mrtnhwtt/kittypass/internal/crypto"
 )
 
 func NewRootCmd() *cobra.Command {
@@ -21,5 +22,6 @@ func NewRootCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().Bool("error", false, "Return error in RunE")
+	cmd.Flags().StringP("algorithm", "a", string(crypto.Ed25519), "Encryption algorithm to use.")
 	return cmd
 }
