@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	root "github.com/mrtnhwtt/kittypass/cmd/cli"
+	root "github.com/mrtnhwtt/kittypass/cli"
 )
 
 func main() {
