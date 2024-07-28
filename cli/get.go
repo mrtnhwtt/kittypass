@@ -16,7 +16,7 @@ func NewGetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "get a saved password",
-		Long:  "Add a saved named password and email pair from your secret storage",
+		Long:  "get a saved named password and email pair from your secret storage",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			master := strings.TrimSpace(prompt.PasswordPrompt("Input master password:"))
 			if master == "" {

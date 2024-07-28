@@ -96,14 +96,14 @@ func (s *Storage) List(name, username string) ([]map[string]string, error) {
 func (s *Storage) Update(id int64, name, username, encryptedPassword, salt, nonce string) error {
 	query := `
     UPDATE passwords
-    SET name = ?, username = ?, encrypted_password = ?, salt = ?
-    WHERE id = ?`
-	_, err := s.db.Exec(query, name, username, encryptedPassword, salt, id)
+    SET name = ?, username = ?, encrypted_password = ?
+    WHERE name = ?`
+	_, err := s.db.Exec(query, name, username, encryptedPassword, name)
 	return err
 }
 
-func (s *Storage) Delete(id int64) error {
-	query := `DELETE FROM passwords WHERE id = ?`
-	_, err := s.db.Exec(query, id)
+func (s *Storage) Delete(name string) error {
+	query := `DELETE FROM passwords WHERE name = ?`
+	_, err := s.db.Exec(query, name)
 	return err
 }
