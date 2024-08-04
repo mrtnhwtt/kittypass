@@ -111,12 +111,30 @@ func (s *Storage) ListAll() ([]map[string]string, error) {
 	return loginList, nil
 }
 
-func (s *Storage) Update(id int64, name, username, encryptedPassword, salt, nonce string) error {
-	query := `
-    UPDATE passwords
-    SET encrypted_password = ?
-    WHERE name = ?`
-	_, err := s.db.Exec(query, encryptedPassword, name)
+func (s *Storage) Update(target, name, username, encryptedPassword, salt string) error {
+	var args []interface{}
+	query := `UPDATE passwords SET`
+	whereClause := " WHERE name = ?"
+	if name != "" {
+		query += " name = ?"
+		args = append(args, name)
+	}
+	if username != "" {
+		query += ", username = ?"
+		args = append(args, username)
+	}
+	if encryptedPassword != "" && salt != "" {
+		query += ", encrypted_password = ?, salt = ?"
+		args = append(args, encryptedPassword)
+		args = append(args, salt)
+	}
+
+	query += whereClause
+	args = append(args, target)
+
+	fmt.Println(args)
+	fmt.Println(query)
+	_, err := s.db.Exec(query, args...)
 	return err
 }
 

@@ -108,7 +108,21 @@ func (kp *KittyPass) Delete() error {
 	return db.Delete(kp.Name)
 }
 
-func (kp *KittyPass) Update() error {
-
+func (kp *KittyPass) Update(target string) error {
+	var cipher string
+	var err error
+	if kp.Password != "" {
+		e := crypto.New("aes")
+		cipher, err = e.Encrypt(kp.DerivationKey, kp.Password)
+		if err != nil {
+			return fmt.Errorf("error while encrypting password: %s", err)
+		}
+	}
+	db, err := storage.New("./database.db")
+	if err != nil {
+		return fmt.Errorf("error while connecting to storage: %s", err)
+	}
+	hexSalt := hex.EncodeToString(kp.Salt)
+	db.Update(target, kp.Name, kp.Username, cipher, hexSalt)
 	return nil
 }
