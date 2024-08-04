@@ -11,7 +11,7 @@ import (
 )
 
 func NewGetCmd() *cobra.Command {
-	kp := kittypass.New()
+	kp := kittypass.NewLogin()
 
 	cmd := &cobra.Command{
 		Use:   "get",

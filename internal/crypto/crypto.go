@@ -38,8 +38,7 @@ func New(t string) Encryption {
 
 }
 
-type Aes struct {
-}
+type Aes struct{}
 
 func (a Aes) Encrypt(masterKey []byte, plainText string) (string, error) {
 	cb, err := aes.NewCipher(masterKey)

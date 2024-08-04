@@ -8,12 +8,12 @@ import (
 )
 
 func NewListCmd() *cobra.Command {
-	kp := kittypass.New()
+	kp := kittypass.NewLogin()
 	cmd := &cobra.Command{
-		Use:   "list",
+		Use:     "list",
 		Aliases: []string{"ls"},
-		Short: "list saved logins",
-		Long:  "list saved logins from your secret storage. Can search for logins using the login name or username",
+		Short:   "list saved logins",
+		Long:    "list saved logins from your secret storage. Can search for logins using the login name or username",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loginList, err := kp.List()
 			if err != nil {
