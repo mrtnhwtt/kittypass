@@ -93,12 +93,30 @@ func (s *Storage) List(name, username string) ([]map[string]string, error) {
 	return loginList, nil
 }
 
+func (s *Storage) ListAll() ([]map[string]string, error) {
+	query := `SELECT username, name FROM passwords`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	var loginList []map[string]string
+	for rows.Next() {
+		var loginName, loginUsername string
+		err := rows.Scan(&loginUsername, &loginName)
+		if err != nil {
+			return nil, err
+		}
+		loginList = append(loginList, map[string]string{"name": loginName, "username": loginUsername})
+	}
+	return loginList, nil
+}
+
 func (s *Storage) Update(id int64, name, username, encryptedPassword, salt, nonce string) error {
 	query := `
     UPDATE passwords
-    SET name = ?, username = ?, encrypted_password = ?
+    SET encrypted_password = ?
     WHERE name = ?`
-	_, err := s.db.Exec(query, name, username, encryptedPassword, name)
+	_, err := s.db.Exec(query, encryptedPassword, name)
 	return err
 }
 

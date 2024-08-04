@@ -86,6 +86,13 @@ func (kp *KittyPass) List() ([]map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error while connecting to storage: %s", err)
 	}
+	if kp.Name == "" && kp.Username == "" {
+		loginList, err := db.ListAll()
+		if err != nil {
+			return nil, err
+		}
+		return loginList, nil
+	}
 	loginList, err := db.List(kp.Name, kp.Username)
 	if err != nil {
 		return nil, err
@@ -99,4 +106,9 @@ func (kp *KittyPass) Delete() error {
 		return fmt.Errorf("error while connecting to storage: %s", err)
 	}
 	return db.Delete(kp.Name)
+}
+
+func (kp *KittyPass) Update() error {
+
+	return nil
 }
