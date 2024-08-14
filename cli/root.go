@@ -1,7 +1,14 @@
 package cli
 
 import (
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	
+)
+
+var (
+	green = color.New(color.FgGreen).SprintFunc()
+	red   = color.New(color.FgRed).SprintFunc()
 )
 
 func NewRootCmd() *cobra.Command {
@@ -18,7 +25,6 @@ func NewRootCmd() *cobra.Command {
 		NewListCmd(),
 		NewDeleteCmd(),
 		NewUpdateCmd(),
-		NewTestCmd(),
 	)
 
 	return cmd

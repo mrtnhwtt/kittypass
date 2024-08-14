@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/mrtnhwtt/kittypass/internal/kittypass"
 	"github.com/mrtnhwtt/kittypass/internal/prompt"
 	"github.com/spf13/cobra"
@@ -16,9 +19,8 @@ func NewAddCmd() *cobra.Command {
 		Aliases: []string{"new"},
 		Short:   "Add a new vault or login.",
 		Long:    "Add a new vault or login. When creating a new vault, choose a master password to be used to add new logins",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
-			return nil
 		},
 	}
 
@@ -45,12 +47,19 @@ func NewAddVaultCmd() *cobra.Command {
 			if vault.Masterpass != confirm {
 				return errors.New("master password does not match")
 			}
-			vault.HashMasterpass()
+			s := spinner.New(spinner.CharSets[26], 150*time.Millisecond)
+			s.Color("green")
+			s.Prefix = "Creating Vault"
+			s.Start()
 
 			err := vault.CreateVault()
 			if err != nil {
+				s.FinalMSG = red("Vault creation failed.\n")
+				s.Stop()
 				return err
 			}
+			s.FinalMSG = green("✓ Vault created successfully.\n")
+			s.Stop()
 			return nil
 		},
 	}
@@ -65,24 +74,52 @@ func NewAddVaultCmd() *cobra.Command {
 func NewAddLoginCmd() *cobra.Command {
 	login := kittypass.NewLogin()
 	vault := kittypass.NewVault()
+	login.Vault = &vault
 	cmd := &cobra.Command{
 		Use:     "login",
-		Aliases: []string{"password", "pass"},
+		Aliases: []string{"pass", "password"},
 		Short:   "Create a new Login",
-		Long: "Create a new Login storing a username and password pair. If no password are provided, generates a new password for the login.",
+		Long:    "Create a new Login storing a username and password pair. If no password are provided, generates a new password for the login.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if login.Generator.Length < 5 || login.Generator.Length > 64 {
+				return fmt.Errorf("invalid password length %d, please set a password length between 5 and 64", login.Generator.Length)
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			vault.Masterpass = strings.TrimSpace(prompt.PasswordPrompt("Input master password:"))
-			if vault.Masterpass == "" {
+			err := login.Vault.Get()
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return errors.New("vault not found. Please check the vault name and try again")
+				}
+				return fmt.Errorf("an error occurred while retrieving the vault: %s", err)
+			}
+
+			s := spinner.New(spinner.CharSets[26], 150*time.Millisecond)
+			s.Color("green")
+			s.Prefix = "Checking Master Password"
+
+			login.Vault.Masterpass = strings.TrimSpace(prompt.PasswordPrompt("Input master password:"))
+			if login.Vault.Masterpass == "" {
 				return errors.New("invalid empty master password")
 			}
-			err := vault.Get()
+
+			s.Start()
+
+			if match := login.Vault.MasterpassMatch(); match != nil {
+				s.FinalMSG = red("Master Password check failed.\n")
+				s.Stop()
+				return errors.New("passwords do not match. Try again")
+			}
+			err = login.Vault.RecreateDerivationKey()
 			if err != nil {
+				s.FinalMSG = red("Opening Vault failed.\n")
+				s.Stop()
 				return err
 			}
-			if match := vault.MasterpassMatch(); match != nil {
-				return fmt.Errorf("failed master password check: %s", match.Error())
-			}
-			
+			s.FinalMSG = green("Successfully opened Vault.\n")
+			s.Stop()
+
 			if login.ProvidePassword {
 				login.Password = strings.TrimSpace(prompt.PasswordPrompt("Input password:"))
 				if login.Password == "" {
@@ -95,12 +132,22 @@ func NewAddLoginCmd() *cobra.Command {
 			} else {
 				login.Password = login.Generator.GeneratePassword()
 			}
+			s.Prefix = "Adding login to Vault"
+			s.Start()
+			err = login.Add()
+			if err != nil {
+				s.FinalMSG = red("Adding login to Vault failed.\n")
+				s.Stop()
+				return err
+			}
+			s.FinalMSG = green("Successfully added login to Vault.\n")
+			s.Stop()
 			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&login.Name, "name", "n", "", "Name of the login")
 	cmd.Flags().StringVarP(&login.Username, "username", "u", "", "Username or email for the login")
-	cmd.Flags().StringVarP(&vault.Name, "vault-name", "v", "", "Name of the Vault")
+	cmd.Flags().StringVarP(&login.Vault.Name, "vault-name", "v", "", "Name of the Vault")
 	cmd.Flags().BoolVarP(&login.ProvidePassword, "password", "p", false, "Use to set the password instead of generating a new password")
 	cmd.Flags().IntVarP(&login.Generator.Length, "lenght", "l", 16, "Length of the generated password")
 	cmd.Flags().BoolVarP(&login.Generator.SpecialChar, "special-char", "s", false, "Use special character in the password")

@@ -1,7 +1,6 @@
 package kittypass
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/rand"
 
@@ -10,7 +9,7 @@ import (
 )
 
 type Login struct {
-	Vault           Vault
+	Vault           *Vault
 	Password        string
 	Username        string
 	Name            string
@@ -41,6 +40,7 @@ func (l *Login) Add() error {
 	if err != nil {
 		return fmt.Errorf("error while connecting to storage: %s", err)
 	}
+	defer db.Close()
 
 	_, err = db.SaveLogin(l.Vault.Uuid, l.Name, l.Username, cipher)
 	if err != nil {
@@ -49,22 +49,23 @@ func (l *Login) Add() error {
 	return nil
 }
 
-func (l *Login) Get(master string) (map[string]string, error) {
+func (l *Login) Get() (map[string]string, error) {
 	db, err := storage.New("./database.db")
 	if err != nil {
 		return nil, fmt.Errorf("error while connecting to storage: %s", err)
 	}
+	defer db.Close()
+
 	stored, err := db.ReadLogin(l.Vault.Uuid, l.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error reading stored password: %s", err)
 	}
-	saltHex := stored["salt"]
-	err = l.Vault.RecreateDerivationKey(saltHex, master)
+	err = l.Vault.RecreateDerivationKey()
 	if err != nil {
 		return nil, fmt.Errorf("error while creating derivation key from stored salt and masterpassword: %s", err)
 	}
 	e := crypto.New("aes")
-	decrypted, err := e.Decrypt(l.Vault.DerivationKey, stored["encrypted_password"])
+	decrypted, err := e.Decrypt(l.Vault.DerivationKey, stored["hex_encrypted_password"])
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +82,7 @@ func (l *Login) List() ([]map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error while connecting to storage: %s", err)
 	}
+	defer db.Close()
 	loginList, err := db.ListLogin(l.Vault.Uuid, l.Name, l.Username)
 	if err != nil {
 		return nil, err
@@ -93,6 +95,7 @@ func (l *Login) Delete() error {
 	if err != nil {
 		return fmt.Errorf("error while connecting to storage: %s", err)
 	}
+	defer db.Close()
 	return db.DeleteLogin(l.Vault.Uuid, l.Name)
 }
 
@@ -110,35 +113,53 @@ func (l *Login) Update(target string) error {
 	if err != nil {
 		return fmt.Errorf("error while connecting to storage: %s", err)
 	}
-	hexSalt := hex.EncodeToString(l.Vault.Salt)
-	db.Update(l.Vault.Uuid, target, l.Name, l.Username, cipher, hexSalt)
+	defer db.Close()
+	err = db.UpdateLogin(l.Vault.Uuid, target, l.Name, l.Username, cipher)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (g *PasswordGenerator) GeneratePassword() string { // need to garantie one of each type if selected
-	numbers := []rune{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}
-    lowercase := []rune{'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'}
-    uppercase := []rune{'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'}
-    specialChars := []rune{'!', '#', '$', '%', '&', '*', '+',  '-', '?', '@', '^', '_', '~'}
+func (g *PasswordGenerator) GeneratePassword() string {
+	lowercase := []rune("abcdefghijklmnopqrstuvwxyz")
+	numbers := []rune("0123456789")
+	uppercase := []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	specialChars := []rune("!#$%&*+-?@^_~")
 
-	characterPool := []rune{}
-	characterPool = append(characterPool, lowercase...)
-	if g.SpecialChar {
-		characterPool = append(characterPool, specialChars...)
-	}
+	var selectedChars []rune
+
+	selectedChars = append(selectedChars, lowercase[rand.Intn(len(lowercase))])
 
 	if g.Numeral {
-		characterPool = append(characterPool, numbers...)
+		selectedChars = append(selectedChars, numbers[rand.Intn(len(numbers))])
 	}
-
 	if g.Uppercase {
-		characterPool = append(characterPool, uppercase...)
+		selectedChars = append(selectedChars, uppercase[rand.Intn(len(uppercase))])
 	}
-	var password string
-	for i := 0; i < g.Length; i++ {
-		randind := rand.Intn(len(characterPool))
-		password = password + string(characterPool[randind])
+	if g.SpecialChar {
+		selectedChars = append(selectedChars, specialChars[rand.Intn(len(specialChars))])
 	}
 
-	return password
+	allChars := lowercase
+	if g.Numeral {
+		allChars = append(allChars, numbers...)
+	}
+	if g.Uppercase {
+		allChars = append(allChars, uppercase...)
+	}
+	if g.SpecialChar {
+		allChars = append(allChars, specialChars...)
+	}
+
+	remainingLength := g.Length - len(selectedChars)
+	for i := 0; i < remainingLength; i++ {
+		selectedChars = append(selectedChars, allChars[rand.Intn(len(allChars))])
+	}
+
+	rand.Shuffle(len(selectedChars), func(i, j int) {
+		selectedChars[i], selectedChars[j] = selectedChars[j], selectedChars[i]
+	})
+
+	return string(selectedChars)
 }

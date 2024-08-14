@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
 
 	"golang.org/x/crypto/argon2"
@@ -41,6 +42,9 @@ func New(t string) Encryption {
 type Aes struct{}
 
 func (a Aes) Encrypt(masterKey []byte, plainText string) (string, error) {
+	if len(masterKey) < 32 {
+		return "", fmt.Errorf("invalid DerivationKey")
+	}
 	cb, err := aes.NewCipher(masterKey)
 	if err != nil {
 		return "", err

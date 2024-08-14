@@ -21,6 +21,6 @@ func PasswordPrompt(label string) string {
             break
         }
     }
-    fmt.Println()
+    fmt.Print("\r\033[K")
     return s
 }
