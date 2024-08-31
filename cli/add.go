@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -89,10 +88,7 @@ func NewAddLoginCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := login.Vault.Get()
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return errors.New("vault not found. Please check the vault name and try again")
-				}
-				return fmt.Errorf("an error occurred while retrieving the vault: %s", err)
+				return err
 			}
 
 			s := spinner.New(spinner.CharSets[26], 150*time.Millisecond)
@@ -106,10 +102,10 @@ func NewAddLoginCmd() *cobra.Command {
 
 			s.Start()
 
-			if match := login.Vault.MasterpassMatch(); match != nil {
+			if err := login.Vault.MasterpassMatch(); err != nil {
 				s.FinalMSG = red("Master Password check failed.\n")
 				s.Stop()
-				return errors.New("passwords do not match. Try again")
+				return err
 			}
 			err = login.Vault.RecreateDerivationKey()
 			if err != nil {
@@ -117,7 +113,7 @@ func NewAddLoginCmd() *cobra.Command {
 				s.Stop()
 				return err
 			}
-			s.FinalMSG = green("Successfully opened Vault.\n")
+			s.FinalMSG = green("✓ Successfully opened Vault.\n")
 			s.Stop()
 
 			if login.ProvidePassword {
@@ -140,7 +136,7 @@ func NewAddLoginCmd() *cobra.Command {
 				s.Stop()
 				return err
 			}
-			s.FinalMSG = green("Successfully added login to Vault.\n")
+			s.FinalMSG = fmt.Sprintf("%s %s %s %s.\n",green("✓ Successfully added login"), blue(login.Name), green("to Vault"), blue(login.Vault.Name))
 			s.Stop()
 			return nil
 		},

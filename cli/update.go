@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -52,60 +51,62 @@ func NewUpdateLoginCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if setPassword || generatePassword {
-				s := spinner.New(spinner.CharSets[26], 150*time.Millisecond)
-				s.Color("green")
-				s.Prefix = "Checking Master Password"
+			s := spinner.New(spinner.CharSets[26], 150*time.Millisecond)
+			s.Color("green")
+			s.Prefix = "Checking Master Password"
 
-				login.Vault.Masterpass = strings.TrimSpace(prompt.PasswordPrompt("Input master password:"))
-				if login.Vault.Masterpass == "" {
-					return errors.New("invalid empty master password")
-				}
+			login.Vault.Masterpass = strings.TrimSpace(prompt.PasswordPrompt("Input master password:"))
+			if login.Vault.Masterpass == "" {
+				return errors.New("invalid empty master password")
+			}
 
-				s.Start()
-				err := login.Vault.Get()
-				if err != nil {
-					s.FinalMSG = red("Master Password check failed.\n")
-					s.Stop()
-					return err
-				}
-				if match := login.Vault.MasterpassMatch(); match != nil {
-					s.FinalMSG = red("Master Password check failed.\n")
-					s.Stop()
-					return fmt.Errorf("failed master password check: %s", match.Error())
-				}
-				err = login.Vault.RecreateDerivationKey()
-				if err != nil {
-					s.FinalMSG = red("Opening Vault failed.\n")
-					s.Stop()
-					return err
-				}
-				s.FinalMSG = green("Successfully opened Vault.\n")
+			s.Start()
+			err = login.Vault.Get()
+			if err != nil {
+				s.FinalMSG = red("Master Password check failed.\n")
 				s.Stop()
-				if setPassword {
-					login.Password = strings.TrimSpace(prompt.PasswordPrompt("Input new password:"))
-					if login.Password == "" {
-						return errors.New("invalid empty password")
-					}
-					confirm := strings.TrimSpace(prompt.PasswordPrompt("Confirm new password:"))
-					if login.Password != confirm {
-						return errors.New("password does not match")
-					}
+				return err
+			}
+			if err = login.Vault.MasterpassMatch(); err != nil {
+				s.FinalMSG = red("Master Password check failed.\n")
+				s.Stop()
+				return err
+			}
+			err = login.Vault.RecreateDerivationKey()
+			if err != nil {
+				s.FinalMSG = red("Opening Vault failed.\n")
+				s.Stop()
+				return err
+			}
+			s.FinalMSG = green("✓ Successfully opened Vault.\n")
+			s.Stop()
+			if setPassword {
+				login.Password = strings.TrimSpace(prompt.PasswordPrompt("Input new password:"))
+				if login.Password == "" {
+					return errors.New("invalid empty password")
 				}
-				if generatePassword {
-					login.Password = login.Generator.GeneratePassword()
+				confirm := strings.TrimSpace(prompt.PasswordPrompt("Confirm new password:"))
+				if login.Password != confirm {
+					return errors.New("password does not match")
 				}
-
+			}
+			if generatePassword {
+				login.Password = login.Generator.GeneratePassword()
 			}
 
-			if login.Vault.Name == "" {
-				return fmt.Errorf("invalid vault name")
-			}
 			err = login.Vault.Get()
 			if err != nil {
 				return err
 			}
-			login.Update(targetName)
+			aff, err := login.Update(targetName)
+			if err != nil {
+				return err
+			}
+			if aff < 1 {
+				fmt.Printf("%s\n", magenta("No login were update, check the name of the login to update and try again"))
+				return nil
+			}
+			fmt.Printf("%s%s%s\n", green("✓ Successfully updated "), blue(aff), green(" Logins."))
 			return nil
 		},
 	}
@@ -141,10 +142,7 @@ func NewUpdateVaultCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := vault.Get()
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return errors.New("vault not found. Please check the vault name and try again")
-				}
-				return fmt.Errorf("an error occurred while retrieving the vault: %s", err)
+				return err
 			}
 			s := spinner.New(spinner.CharSets[26], 150*time.Millisecond)
 			s.Color("green")
@@ -161,7 +159,7 @@ func NewUpdateVaultCmd() *cobra.Command {
 				s.Stop()
 				return fmt.Errorf("failed master password check: %s", match.Error())
 			}
-			s.FinalMSG = green("Successfully opened Vault.\n")
+			s.FinalMSG = green("✓ Successfully opened Vault.\n")
 			s.Stop()
 
 			if setNewPass {
@@ -178,8 +176,16 @@ func NewUpdateVaultCmd() *cobra.Command {
 					return err
 				}
 			}
+
+			s = spinner.New(spinner.CharSets[26], 150*time.Millisecond)
+			s.Color("green")
+			s.Prefix = "Updating Vault"
+			s.Start()
+
 			affected, err := vault.Update(newPassword, newName, newDescription)
-			fmt.Printf("%v", affected)
+			s.Stop()
+			fmt.Printf("%s%s%s\n", green("✓ Successfully updated "), blue(affected["updated_vault"]), green(" Vault."))
+			fmt.Printf("%s%s%s\n", green("✓ Successfully updated "), blue(affected["updated_login"]), green(" Logins."))
 			return err
 			// return nil
 		},

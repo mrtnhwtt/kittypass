@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	_ "github.com/mattn/go-sqlite3"
+	sqlite3 "github.com/mattn/go-sqlite3"
 )
 
 type Storage struct {
@@ -77,6 +77,11 @@ func (s *Storage) SaveVault(name, description, hexHashedMaster, hexSalt string) 
 	query := `INSERT INTO vaults (uuid, name, description, hex_hashed_master_password, hex_salt) VALUES (?, ?, ?, ?, ?)`
 	result, err := s.db.Exec(query, uuid, name, description, hexHashedMaster, hexSalt)
 	if err != nil {
+		if sqliteErr, ok := err.(sqlite3.Error); ok {
+			if sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
+				return 0, StorageConstraintError{Field: "name", Type: "Vault"}
+			}
+		}
 		log.Printf("failed to save vault. err: %s", err)
 		return 0, StorageUpdateError{}
 	}
@@ -373,7 +378,7 @@ func (s *Storage) ListLogin(vault_uuid, name, username string) ([]map[string]str
 	return loginList, nil
 }
 
-func (s *Storage) UpdateLogin(vaultUuid, target, name, username, hexEncryptedPassword string) error {
+func (s *Storage) UpdateLogin(vaultUuid, target, name, username, hexEncryptedPassword string) (int64, error) {
 	var args []interface{}
 	query := `UPDATE passwords SET`
 	whereClause := " WHERE name = ? AND vault_uuid = ?"
@@ -399,15 +404,15 @@ func (s *Storage) UpdateLogin(vaultUuid, target, name, username, hexEncryptedPas
 	res, err := s.db.Exec(query, args...)
 	if err != nil {
 		log.Printf("failed to update login name %s and username %s associated with vault uuid %s. err: %s", name, username, vaultUuid, err)
-		return StorageUpdateError{}
+		return 0, StorageUpdateError{}
 	}
 	aff, err := res.RowsAffected()
 	if err != nil {
 		log.Printf("could not get the number of updated login entries: %s", err)
-		return StorageUpdateError{}
+		return 0, StorageUpdateError{}
 	}
-	fmt.Printf("row affected: %d", aff)
-	return nil
+
+	return aff, nil
 }
 
 func (s *Storage) DeleteLogin(vault_uuid, name string) error {

@@ -9,6 +9,9 @@ import (
 var (
 	green = color.New(color.FgGreen).SprintFunc()
 	red   = color.New(color.FgRed).SprintFunc()
+	blue = color.New(color.FgBlue).SprintFunc()
+	magenta = color.New(color.FgMagenta).SprintFunc()
+
 )
 
 func NewRootCmd() *cobra.Command {
@@ -17,6 +20,7 @@ func NewRootCmd() *cobra.Command {
 		Use:   "kittypass",
 		Short: "A CLI password manager",
 		Long:  "A CLI password manager to securely stock your password. Interact with your password in a declarative or interactive mod.",
+		SilenceUsage: true,
 	}
 
 	cmd.AddCommand(
@@ -26,6 +30,7 @@ func NewRootCmd() *cobra.Command {
 		NewDeleteCmd(),
 		NewUpdateCmd(),
 	)
+	// TODO: implement a migration command to migrate a vault between different storage.
 
 	return cmd
 }

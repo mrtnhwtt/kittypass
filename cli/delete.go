@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -57,19 +56,19 @@ func NewDeleteLoginCmd() *cobra.Command {
 				s.Stop()
 				return err
 			}
-			if match := login.Vault.MasterpassMatch(); match != nil {
+			if err := login.Vault.MasterpassMatch(); err != nil {
 				s.FinalMSG = red("Master Password check failed.\n")
 				s.Stop()
-				return errors.New("incorrect password")
+				return err
 			}
-			s.FinalMSG = green("Successfully opened Vault.\n")
+			s.FinalMSG = green("✓ Successfully opened Vault.\n")
 			s.Stop()
 			err = login.Delete()
 			if err != nil {
 				fmt.Println(red("Failed to delete login"))
 				return err
 			}
-			fmt.Println(green("Successfully deleted login"))
+			fmt.Println(green("✓ Successfully deleted login"))
 			return nil
 		},
 	}
@@ -91,10 +90,7 @@ func NewDeleteVaultCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := vault.Get()
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return errors.New("vault not found. Please check the vault name and try again")
-				}
-				return fmt.Errorf("an error occurred while retrieving the vault: %s", err)
+				return err
 			}
 			s := spinner.New(spinner.CharSets[26], 150*time.Millisecond)
 			s.Color("green")
@@ -110,19 +106,15 @@ func NewDeleteVaultCmd() *cobra.Command {
 			if match := vault.MasterpassMatch(); match != nil {
 				s.FinalMSG = red("Failed master password check.\n")
 				s.Stop()
-				return errors.New("the master password you entered is incorrect. Please try again")
+				return err
 			}
-			s.FinalMSG = green("Successfully opened Vault for deletion.\n")
+			s.FinalMSG = green("✓ Successfully opened Vault for deletion.\n")
 			s.Stop()
 			deleted, err := vault.Delete()
 			if err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return errors.New("unable to delete vault. It may not exist or might have been deleted already")
-				}
-				return fmt.Errorf("an error occurred while deleting the vault: %s", err)
-
+				return err
 			}
-			fmt.Printf("Deleted logins: %d\nDeleted vaults: %d\n", deleted["delete_login"], deleted["delete_vault"])
+			fmt.Printf("✓ Deleted logins: %d\n✓ Deleted vaults: %d\n", deleted["delete_login"], deleted["delete_vault"])
 			return nil
 		},
 	}
