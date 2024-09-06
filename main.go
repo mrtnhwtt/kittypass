@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
 
 	cc "github.com/ivanpirog/coloredcobra"
 	root "github.com/mrtnhwtt/kittypass/cli"
@@ -10,15 +11,18 @@ import (
 )
 
 func main() {
-	conf := config.InitializeConfig() // add this to an app struct ?
+	conf := config.InitializeConfig()
 
-	homedir, err := os.UserHomeDir()
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+
+	logPath := conf.GetString("log_path")
+	dir := filepath.Dir(logPath)
+	err := os.MkdirAll(dir, 0755)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	file, err := os.OpenFile(homedir+"/.kittypass.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666) //TODO: replace with path set in config
+	file, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}

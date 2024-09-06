@@ -71,7 +71,7 @@ Planned Features:
 
 - [ ] Instead of a unique salt per Vault, implement unique salt per Login.
 - [ ] Develop a TUI
-- [ ] Integrate Viper for configuration management, allowing users to customize storage and logs location.
+- [x] Integrate Viper for configuration management, allowing users to customize storage and logs location.
 - [ ] Add support for other storage methods beyond SQLite
 - [ ] Add support for other encryption algorithms
 

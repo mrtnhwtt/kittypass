@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
-
+	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -12,13 +14,17 @@ import (
 func InitializeConfig() *viper.Viper {
 	v := viper.New()
 
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	v.SetDefault("encryption", "aes")
 	v.SetDefault("storage", "sqlite")
-	v.SetDefault("log_path", "$HOME/.local/share/kittypass/logs/")
+	v.SetDefault("log_path", filepath.Join(homeDir, ".local/share/kittypass/logs/kittypass.log"))
 
+	v.AddConfigPath(filepath.Join(homeDir, ".config/kittypass"))
 	v.AddConfigPath("/etc/kittypass")
-	v.AddConfigPath("$HOME/.config/kittypass")
-	v.AddConfigPath("$XDG_CONFIG_HOME/.config/kittypass")
 
 	v.SetEnvPrefix("KTPS")
 
@@ -27,7 +33,7 @@ func InitializeConfig() *viper.Viper {
 }
 
 // From https://github.com/carolynvs/stingoftheviper
-func BindFlags(cmd *cobra.Command, v *viper.Viper) { // TODO: add this in persistentprerun in the root command to bind all flags for all commands
+func BindFlags(cmd *cobra.Command, v *viper.Viper) {
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		configName := f.Name
 		if !f.Changed && v.IsSet(configName) {

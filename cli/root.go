@@ -20,9 +20,13 @@ func NewRootCmd(conf *viper.Viper) *cobra.Command {
 		Short:        "A CLI password manager",
 		Long:         "A CLI password manager to securely stock your password.",
 		SilenceUsage: true,
+		// Using PersistentPreRun will run this code on each command, binding the flags to the config.
+		// If a child command implements PersistentPreRun, it will override this one, so it needs to run BindFlags too
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			config.BindFlags(cmd, conf)
 		},
+		// TODO: TUI implementation here. Calling a subcommand won't launch the TUI, they will always be imperative
+		// RunE: func(cmd *cobra.Command, args []string) error { return nil },
 	}
 
 	cmd.AddCommand(
