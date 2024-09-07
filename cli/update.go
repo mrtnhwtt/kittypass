@@ -10,9 +10,10 @@ import (
 	"github.com/mrtnhwtt/kittypass/internal/kittypass"
 	"github.com/mrtnhwtt/kittypass/internal/prompt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func NewUpdateCmd() *cobra.Command {
+func NewUpdateCmd(conf *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "update",
 		Aliases: []string{"put", "modify", "mod"},
@@ -24,14 +25,14 @@ func NewUpdateCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		NewUpdateLoginCmd(),
-		NewUpdateVaultCmd(),
+		NewUpdateLoginCmd(conf),
+		NewUpdateVaultCmd(conf),
 	)
 
 	return cmd
 }
 
-func NewUpdateLoginCmd() *cobra.Command {
+func NewUpdateLoginCmd(conf *viper.Viper) *cobra.Command {
 	login := kittypass.NewLogin()
 	vault := kittypass.NewVault()
 	login.Vault = &vault
@@ -42,6 +43,9 @@ func NewUpdateLoginCmd() *cobra.Command {
 		Aliases: []string{"put", "modify", "mod"},
 		Short:   "update a login",
 		Long:    "update a login password or username from your secret storage",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return login.Vault.OpenDbConnection(conf)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			setPassword, err := cmd.Flags().GetBool("password")
 			if err != nil {
@@ -72,12 +76,7 @@ func NewUpdateLoginCmd() *cobra.Command {
 				s.Stop()
 				return err
 			}
-			err = login.Vault.RecreateDerivationKey()
-			if err != nil {
-				s.FinalMSG = red("Opening Vault failed.\n")
-				s.Stop()
-				return err
-			}
+
 			s.FinalMSG = green("✓ Successfully opened Vault.\n")
 			s.Stop()
 			if setPassword {
@@ -130,7 +129,7 @@ func NewUpdateLoginCmd() *cobra.Command {
 	return cmd
 }
 
-func NewUpdateVaultCmd() *cobra.Command {
+func NewUpdateVaultCmd(conf *viper.Viper) *cobra.Command {
 	vault := kittypass.NewVault()
 	var newName, newDescription, newPassword string
 	var setNewPass bool
@@ -139,6 +138,9 @@ func NewUpdateVaultCmd() *cobra.Command {
 		Aliases: []string{"folder"},
 		Short:   "update a vault",
 		Long:    "update a vault name, description or master password",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return vault.OpenDbConnection(conf)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := vault.Get()
 			if err != nil {
@@ -170,10 +172,6 @@ func NewUpdateVaultCmd() *cobra.Command {
 				confirm := strings.TrimSpace(prompt.PasswordPrompt("Confirm new master password:"))
 				if newPassword != confirm {
 					return errors.New("master password does not match")
-				}
-				err = vault.RecreateDerivationKey()
-				if err != nil {
-					return err
 				}
 			}
 

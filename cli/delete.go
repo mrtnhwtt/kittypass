@@ -10,9 +10,10 @@ import (
 	"github.com/mrtnhwtt/kittypass/internal/kittypass"
 	"github.com/mrtnhwtt/kittypass/internal/prompt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func NewDeleteCmd() *cobra.Command {
+func NewDeleteCmd(conf *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "delete",
 		Aliases: []string{"rm", "remove"},
@@ -23,13 +24,13 @@ func NewDeleteCmd() *cobra.Command {
 		},
 	}
 	cmd.AddCommand(
-		NewDeleteLoginCmd(),
-		NewDeleteVaultCmd(),
+		NewDeleteLoginCmd(conf),
+		NewDeleteVaultCmd(conf),
 	)
 	return cmd
 }
 
-func NewDeleteLoginCmd() *cobra.Command {
+func NewDeleteLoginCmd(conf *viper.Viper) *cobra.Command {
 	login := kittypass.NewLogin()
 	vault := kittypass.NewVault()
 	login.Vault = &vault
@@ -39,6 +40,9 @@ func NewDeleteLoginCmd() *cobra.Command {
 		Aliases: []string{"pass", "password"},
 		Short:   "delete a saved login",
 		Long:    "delete a saved logins from a vault using the login and vault name",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return login.Vault.OpenDbConnection(conf)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			s := spinner.New(spinner.CharSets[26], 150*time.Millisecond)
 			s.Color("green")
@@ -79,7 +83,7 @@ func NewDeleteLoginCmd() *cobra.Command {
 	return cmd
 }
 
-func NewDeleteVaultCmd() *cobra.Command {
+func NewDeleteVaultCmd(conf *viper.Viper) *cobra.Command {
 	vault := kittypass.NewVault()
 
 	cmd := &cobra.Command{
@@ -87,6 +91,9 @@ func NewDeleteVaultCmd() *cobra.Command {
 		Aliases: []string{"folder"},
 		Short:   "Delete a Vault.",
 		Long:    "Delete a Vault and all associated logins. Requires the master password.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return vault.OpenDbConnection(conf)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := vault.Get()
 			if err != nil {

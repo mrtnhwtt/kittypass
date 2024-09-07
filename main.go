@@ -28,6 +28,12 @@ func main() {
 	}
 	log.SetOutput(file)
 
+	storagePath := conf.GetString("storage_path")
+	dir = filepath.Dir(storagePath)
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
 	cmd := root.NewRootCmd(conf)
 	cc.Init(&cc.Config{
 		RootCmd:  cmd,

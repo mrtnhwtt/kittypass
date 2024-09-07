@@ -11,9 +11,10 @@ import (
 	"github.com/mrtnhwtt/kittypass/internal/prompt"
 	"github.com/mrtnhwtt/kittypass/internal/utils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func NewGetCmd() *cobra.Command {
+func NewGetCmd(conf *viper.Viper) *cobra.Command {
 	login := kittypass.NewLogin()
 	vault := kittypass.NewVault()
 	login.Vault = &vault
@@ -23,6 +24,9 @@ func NewGetCmd() *cobra.Command {
 		Aliases: []string{"fetch", "copy"},
 		Short:   "get a login",
 		Long:    "get a login from a vault, adds the password to the clipboard",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return login.Vault.OpenDbConnection(conf)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			s := spinner.New(spinner.CharSets[26], 150*time.Millisecond)
 			s.Color("green")
@@ -45,12 +49,7 @@ func NewGetCmd() *cobra.Command {
 				s.Stop()
 				return errors.New("incorrect password")
 			}
-			err = login.Vault.RecreateDerivationKey()
-			if err != nil {
-				s.FinalMSG = red("Opening Vault failed.\n")
-				s.Stop()
-				return err
-			}
+
 			s.FinalMSG = green("✓ Successfully opened Vault.\n")
 			s.Stop()
 			login, err := login.Get()

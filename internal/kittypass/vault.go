@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"log"
 
-	"github.com/mrtnhwtt/kittypass/internal/crypto"
 	"github.com/mrtnhwtt/kittypass/internal/storage"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -17,54 +17,29 @@ type Vault struct {
 	Description       string
 	Masterpass        string
 	HexHashMasterpass string
-	HexSalt           string
-	DerivationKey     []byte
-	Salt              []byte
+	Db                *storage.Storage
 }
 
 func NewVault() Vault {
 	return Vault{}
 }
 
-// UseMasterPassword generate a DerivationKey from a master password to use to encrypt and decrypt passwords stored in kittypass
-func (v *Vault) UseMasterPassword() error {
+func (v *Vault) OpenDbConnection(conf *viper.Viper) error {
 	var err error
-	v.Salt, err = crypto.GenerateRandomSalt(16)
+	v.Db, err = storage.New(conf.GetString("storage_path"))
 	if err != nil {
 		return err
 	}
-	v.HexSalt = hex.EncodeToString(v.Salt)
-	v.DerivationKey = crypto.GenerateKey([]byte(v.Masterpass), v.Salt)
-	return nil
-}
-
-func (v *Vault) RecreateDerivationKey() error {
-	salt, err := hex.DecodeString(v.HexSalt)
-	if err != nil {
-		log.Printf("error when decoding salt: %s", err)
-		return MalformedDataError{Data: "salt"}
-	}
-	v.Salt = salt
-	v.DerivationKey = crypto.GenerateKey([]byte(v.Masterpass), v.Salt)
 	return nil
 }
 
 func (v *Vault) CreateVault() error {
-	err := v.UseMasterPassword()
+	err := v.HashMasterpass()
 	if err != nil {
 		return err
 	}
-	err = v.HashMasterpass()
-	if err != nil {
-		return err
-	}
-	db, err := storage.New("./database.db")
-	if err != nil {
-		return err
-	}
-	defer db.Close()
 
-	_, err = db.SaveVault(v.Name, v.Description, v.HexHashMasterpass, v.HexSalt)
+	_, err = v.Db.SaveVault(v.Name, v.Description, v.HexHashMasterpass)
 	if err != nil {
 		return err
 	}
@@ -96,33 +71,18 @@ func (v *Vault) MasterpassMatch() error {
 }
 
 func (v *Vault) Get() error {
-	db, err := storage.New("./database.db")
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	vaultData, err := db.GetVault(v.Name)
+	vaultData, err := v.Db.GetVault(v.Name)
 	if err != nil {
 		return err
 	}
 	v.Uuid = vaultData["uuid"]
 	v.Description = vaultData["description"]
 	v.HexHashMasterpass = vaultData["hex_hashed_master_password"]
-	v.HexSalt = vaultData["hex_salt"]
-	v.Salt, err = hex.DecodeString(v.HexSalt)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
 func (v *Vault) List() ([]map[string]string, error) {
-	db, err := storage.New("./database.db")
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-	vaultList, err := db.ListVault(v.Name)
+	vaultList, err := v.Db.ListVault(v.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -130,12 +90,7 @@ func (v *Vault) List() ([]map[string]string, error) {
 }
 
 func (v *Vault) Delete() (map[string]int64, error) {
-	db, err := storage.New("./database.db")
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-	deleted, err := db.DeleteVault(v.Name, v.Uuid)
+	deleted, err := v.Db.DeleteVault(v.Name, v.Uuid)
 	if err != nil {
 		return nil, err
 	}
@@ -143,54 +98,55 @@ func (v *Vault) Delete() (map[string]int64, error) {
 }
 
 func (v *Vault) Update(newMasterPass, newName, newDescription string) (map[string]int, error) {
-	var err error
-	var loginList []map[string]string
-	db, err := storage.New("./database.db")
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-	if newMasterPass != "" {
-		loginList, err = v.reencryptLogins(db, newMasterPass)
-		if err != nil {
-			return nil, err
-		}
+	// var err error
+	// var loginList []map[string]string
+	// defer v.Db.Close()
+	// if newMasterPass != "" {
+	// 	loginList, err = v.reencryptLogins(newMasterPass)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 
-	}
-	return db.UpdateVault(v.Uuid, newName, newDescription, v.HexHashMasterpass, v.HexSalt, loginList)
+	// }
+	// return v.Db.UpdateVault(v.Uuid, newName, newDescription, v.HexHashMasterpass, loginList)
+	return nil, nil
 
 }
 
-func (v *Vault) reencryptLogins(db *storage.Storage, newMasterPass string) ([]map[string]string, error) {
-	// get all login and decrypt the passwords
-	e := crypto.New("aes")
-	loginList, err := db.ReadLogins(v.Uuid)
-	if err != nil {
-		return nil, err
-	}
-	for _, login := range loginList {
-		login["decrypted"], err = e.Decrypt(v.DerivationKey, login["hex_enc_pass"])
-		if err != nil {
-			return nil, err
-		}
-	}
+func (v *Vault) reencryptLogins(newMasterPass string) ([]map[string]string, error) {
+	// // get all login and decrypt the passwords
+	// e := crypto.New("aes")
+	// loginList, err := v.Db.ReadLogins(v.Uuid)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// // TODO: create a list of Login struct
+	// // TODO call recreate derivation key
+	// for _, loginData := range loginList {
+	// 	login := NewLogin()
+	// 		login["decrypted"], err = e.Decrypt(v.DerivationKey, login["hex_enc_pass"])
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
-	// create a new derivation key from the new password and encrypt login passwords
-	v.Masterpass = newMasterPass
-	err = v.UseMasterPassword()
-	if err != nil {
-		return nil, err
-	}
-	err = v.HashMasterpass()
-	if err != nil {
-		return nil, err
-	}
-	for _, login := range loginList {
-		login["newHexEncrypted"], err = e.Encrypt(v.DerivationKey, login["decrypted"])
-		if err != nil {
-			return nil, err
-		}
-		delete(login, "decrypted")
-	}
-	return loginList, nil
+	// // create a new derivation key from the new password and encrypt login passwords
+	// v.Masterpass = newMasterPass
+	// err = v.UseMasterPassword()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// err = v.HashMasterpass()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// for _, login := range loginList {
+	// 	login["newHexEncrypted"], err = e.Encrypt(v.DerivationKey, login["decrypted"])
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	delete(login, "decrypted")
+	// }
+	// return loginList, nil
+	return nil, nil
 }

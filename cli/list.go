@@ -6,9 +6,10 @@ import (
 	"github.com/mrtnhwtt/kittypass/internal/kittypass"
 	"github.com/mrtnhwtt/kittypass/internal/utils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func NewListCmd() *cobra.Command {
+func NewListCmd(conf *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -19,13 +20,13 @@ func NewListCmd() *cobra.Command {
 		},
 	}
 	cmd.AddCommand(
-		NewListLoginCmd(),
-		NewListVaultCmd(),
+		NewListLoginCmd(conf),
+		NewListVaultCmd(conf),
 	)
 	return cmd
 }
 
-func NewListLoginCmd() *cobra.Command {
+func NewListLoginCmd(conf *viper.Viper) *cobra.Command {
 	login := kittypass.NewLogin()
 	vault := kittypass.NewVault()
 	login.Vault = &vault
@@ -35,6 +36,9 @@ func NewListLoginCmd() *cobra.Command {
 		Aliases: []string{"passwords", "pass", "logins", "password"},
 		Short:   "lists logins",
 		Long:    "lists logins. Search for login from login name, username or email. Limit search to a specific vault",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return login.Vault.OpenDbConnection(conf)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if login.Vault.Name != "" {
 				err := login.Vault.Get()
@@ -68,13 +72,16 @@ func NewListLoginCmd() *cobra.Command {
 	return cmd
 }
 
-func NewListVaultCmd() *cobra.Command {
+func NewListVaultCmd(conf *viper.Viper) *cobra.Command {
 	vault := kittypass.NewVault()
 	cmd := &cobra.Command{
 		Use:     "vault",
 		Aliases: []string{"folder", "vaults", "folders"},
 		Short:   "lists vaults",
 		Long:    "lists vaults. Search for a vault by providing a name.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return vault.OpenDbConnection(conf)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			vaultList, err := vault.List()
 			if err != nil {

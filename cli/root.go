@@ -30,11 +30,11 @@ func NewRootCmd(conf *viper.Viper) *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		NewAddCmd(),
-		NewGetCmd(),
-		NewListCmd(),
-		NewDeleteCmd(),
-		NewUpdateCmd(),
+		NewAddCmd(conf),
+		NewGetCmd(conf),
+		NewListCmd(conf),
+		NewDeleteCmd(conf),
+		NewUpdateCmd(conf),
 	)
 	// TODO: implement a migration command to migrate a vault between different storage.
 

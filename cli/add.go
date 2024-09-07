@@ -10,9 +10,10 @@ import (
 	"github.com/mrtnhwtt/kittypass/internal/kittypass"
 	"github.com/mrtnhwtt/kittypass/internal/prompt"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-func NewAddCmd() *cobra.Command {
+func NewAddCmd(conf *viper.Viper) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "add",
 		Aliases: []string{"new"},
@@ -24,19 +25,22 @@ func NewAddCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(
-		NewAddVaultCmd(),
-		NewAddLoginCmd(),
+		NewAddVaultCmd(conf),
+		NewAddLoginCmd(conf),
 	)
 	return cmd
 }
 
-func NewAddVaultCmd() *cobra.Command {
+func NewAddVaultCmd(conf *viper.Viper) *cobra.Command {
 	vault := kittypass.NewVault()
 	cmd := &cobra.Command{
 		Use:     "vault",
 		Aliases: []string{"folder"},
 		Short:   "Create a new Vault.",
 		Long:    "Create a new Vault to store login infornmation. Requires a master password.",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return vault.OpenDbConnection(conf)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			vault.Masterpass = strings.TrimSpace(prompt.PasswordPrompt("Input master password:"))
 			if vault.Masterpass == "" {
@@ -70,7 +74,7 @@ func NewAddVaultCmd() *cobra.Command {
 	return cmd
 }
 
-func NewAddLoginCmd() *cobra.Command {
+func NewAddLoginCmd(conf *viper.Viper) *cobra.Command {
 	login := kittypass.NewLogin()
 	vault := kittypass.NewVault()
 	login.Vault = &vault
@@ -83,7 +87,7 @@ func NewAddLoginCmd() *cobra.Command {
 			if login.Generator.Length < 5 || login.Generator.Length > 64 {
 				return fmt.Errorf("invalid password length %d, please set a password length between 5 and 64", login.Generator.Length)
 			}
-			return nil
+			return login.Vault.OpenDbConnection(conf)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			err := login.Vault.Get()
@@ -104,12 +108,6 @@ func NewAddLoginCmd() *cobra.Command {
 
 			if err := login.Vault.MasterpassMatch(); err != nil {
 				s.FinalMSG = red("Master Password check failed.\n")
-				s.Stop()
-				return err
-			}
-			err = login.Vault.RecreateDerivationKey()
-			if err != nil {
-				s.FinalMSG = red("Opening Vault failed.\n")
 				s.Stop()
 				return err
 			}
@@ -136,7 +134,7 @@ func NewAddLoginCmd() *cobra.Command {
 				s.Stop()
 				return err
 			}
-			s.FinalMSG = fmt.Sprintf("%s %s %s %s.\n",green("✓ Successfully added login"), blue(login.Name), green("to Vault"), blue(login.Vault.Name))
+			s.FinalMSG = fmt.Sprintf("%s %s %s %s.\n", green("✓ Successfully added login"), blue(login.Name), green("to Vault"), blue(login.Vault.Name))
 			s.Stop()
 			return nil
 		},

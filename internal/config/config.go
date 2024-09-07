@@ -21,7 +21,8 @@ func InitializeConfig() *viper.Viper {
 
 	v.SetDefault("encryption", "aes") // TODO: this should do something once another encryption algo is implemented
 	v.SetDefault("storage", "sqlite") // TODO: this should do something once another storage option is implemented
-	v.SetDefault("log_path", filepath.Join(homeDir, ".local/share/kittypass/logs/kittypass.log"))
+	v.SetDefault("log_path", filepath.Join(homeDir, ".local/share/kittypass/logs", "kittypass.log"))
+	v.SetDefault("storage_path", filepath.Join(homeDir, ".local/share/kittypass/storage", "kittypass.db"))
 
 	v.AddConfigPath(filepath.Join(homeDir, ".config/kittypass"))
 	v.AddConfigPath("/etc/kittypass")
