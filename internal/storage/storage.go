@@ -137,7 +137,7 @@ func (s *Storage) ListVault(name string) ([]map[string]string, error) {
 	return vaultList, nil
 }
 
-func (s *Storage) UpdateVault(vaultUuid, newName, newDescription, newMasterPassHashedHex, newSalt string, loginList []map[string]string) (map[string]int, error) { //TODO: update this for login unique salt
+func (s *Storage) UpdateVault(vaultUuid, newName, newDescription, newMasterPassHashedHex string, loginList []map[string]string) (map[string]int, error) { //TODO: update this for login unique salt
 	affectedLogin := 0
 	affectedVault := 0
 	tx, err := s.db.Begin()
@@ -151,7 +151,7 @@ func (s *Storage) UpdateVault(vaultUuid, newName, newDescription, newMasterPassH
 			tx.Rollback()
 		}
 	}()
-	if len(loginList) > 0 {
+	if len(loginList) > 0 { //TODO: add hex_salt
 		loginQuery := `UPDATE passwords SET hex_encrypted_password = ? WHERE name = ? AND vault_uuid = ?`
 		for _, login := range loginList {
 			res, err := tx.Exec(loginQuery, login["newHexEncrypted"], login["name"], vaultUuid)
@@ -187,8 +187,6 @@ func (s *Storage) UpdateVault(vaultUuid, newName, newDescription, newMasterPassH
 		args = append(args, newDescription)
 	}
 	if len(loginList) > 0 {
-		setClause = append(setClause, " hex_salt = ?")
-		args = append(args, newSalt)
 		setClause = append(setClause, " hex_hashed_master_password = ?")
 		args = append(args, newMasterPassHashedHex)
 	}

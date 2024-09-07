@@ -106,11 +106,11 @@ func (l *Login) Delete() error {
 func (l *Login) Update(target string) (int64, error) {
 	var cipher string
 	var err error
-	err = l.UseMasterPassword()
-	if err != nil {
-		return 0, err
-	}
 	if l.Password != "" {
+		err = l.UseMasterPassword()
+		if err != nil {
+			return 0, err
+		}
 		e := crypto.New("aes")
 		cipher, err = e.Encrypt(l.DerivationKey, l.Password)
 		if err != nil {
