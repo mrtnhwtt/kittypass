@@ -25,8 +25,11 @@ func NewLogin() Login {
 	}
 }
 
-// Create an hex of the salt and encrypted password 
+// Create an hex of the salt and encrypted password
 func (l *Login) PrepareHex() {}
+
+// retrieve the salt and cipher from stored hex
+func (l *Login) ReadHex() {}
 
 // UseMasterPassword generate a DerivationKey from a master password to use to encrypt and decrypt passwords stored in kittypass
 func (l *Login) UseMasterPassword() error {
@@ -79,7 +82,7 @@ func (l *Login) Get() (map[string]string, error) {
 		return nil, err
 	}
 	e := crypto.New("aes")
-	decrypted, err := e.Decrypt(l.DerivationKey, stored["hex_encrypted_password"])
+	decrypted, err := e.Decrypt(l.DerivationKey, stored["hex_cipher"])
 	if err != nil {
 		return nil, err
 	}

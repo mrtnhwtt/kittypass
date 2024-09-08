@@ -42,7 +42,7 @@ func (s *Storage) initDB() error {
         uuid TEXT PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
 		description TEXT NOT NULL,
-        hex_hashed_master_password TEXT NOT NULL,
+        hex_cipher TEXT NOT NULL,
         date_created DATETIME DEFAULT CURRENT_TIMESTAMP
     );`
 	_, err := s.db.Exec(vaultsQuery)
@@ -56,7 +56,7 @@ func (s *Storage) initDB() error {
         vault_uuid TEXT NOT NULL,
         name TEXT NOT NULL,
         username TEXT NOT NULL,
-        hex_encrypted_password TEXT NOT NULL,
+        hex_cipher TEXT NOT NULL,
 		hex_salt TEXT NOT NULL,
         date_created DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(vault_uuid) REFERENCES vaults(uuid)
@@ -74,7 +74,7 @@ func (s *Storage) SaveVault(name, description, hexHashedMaster string) (int64, e
 	if err != nil {
 		return 0, fmt.Errorf("error while generating an uuid for the vault: %s", err)
 	}
-	query := `INSERT INTO vaults (uuid, name, description, hex_hashed_master_password) VALUES (?, ?, ?, ?)`
+	query := `INSERT INTO vaults (uuid, name, description, hex_cipher) VALUES (?, ?, ?, ?)`
 	result, err := s.db.Exec(query, uuid, name, description, hexHashedMaster)
 	if err != nil {
 		if sqliteErr, ok := err.(sqlite3.Error); ok {
@@ -88,11 +88,13 @@ func (s *Storage) SaveVault(name, description, hexHashedMaster string) (int64, e
 	return result.LastInsertId()
 }
 
+// GetVault return a map containing the following: "uuid": string, "description": string, "hex_cipher": string.
+// Returns a VaultNotFound error when the query to the database failed
 func (s *Storage) GetVault(name string) (map[string]string, error) {
-	query := `SELECT uuid, description, hex_hashed_master_password FROM vaults WHERE name = ?`
+	query := `SELECT uuid, description, hex_cipher FROM vaults WHERE name = ?`
 	row := s.db.QueryRow(query, name)
-	var uuid, description, hexHashedMasterPassword string
-	err := row.Scan(&uuid, &description, &hexHashedMasterPassword)
+	var uuid, description, hexcipher string
+	err := row.Scan(&uuid, &description, &hexcipher)
 	if err != nil {
 		log.Printf("failed to read entry from database: %s", err)
 		if errors.Is(sql.ErrNoRows, err) {
@@ -101,9 +103,9 @@ func (s *Storage) GetVault(name string) (map[string]string, error) {
 		return nil, VaultNotFound{}
 	}
 	return map[string]string{
-		"uuid":                       uuid,
-		"description":                description,
-		"hex_hashed_master_password": hexHashedMasterPassword,
+		"uuid":        uuid,
+		"description": description,
+		"hex_cipher":  hexcipher,
 	}, nil
 }
 
@@ -137,7 +139,7 @@ func (s *Storage) ListVault(name string) ([]map[string]string, error) {
 	return vaultList, nil
 }
 
-func (s *Storage) UpdateVault(vaultUuid, newName, newDescription, newMasterPassHashedHex string, loginList []map[string]string) (map[string]int, error) { //TODO: update this for login unique salt
+func (s *Storage) UpdateVault(vaultUuid, newName, newDescription, newVaultHexcipher string, loginList []map[string]string) (map[string]int, error) { //TODO: update this for login unique salt
 	affectedLogin := 0
 	affectedVault := 0
 	tx, err := s.db.Begin()
@@ -151,10 +153,10 @@ func (s *Storage) UpdateVault(vaultUuid, newName, newDescription, newMasterPassH
 			tx.Rollback()
 		}
 	}()
-	if len(loginList) > 0 { //TODO: add hex_salt
-		loginQuery := `UPDATE passwords SET hex_encrypted_password = ? WHERE name = ? AND vault_uuid = ?`
+	if len(loginList) > 0 {
+		loginQuery := `UPDATE passwords SET hex_cipher = ?, hex_salt = ? WHERE name = ? AND vault_uuid = ?`
 		for _, login := range loginList {
-			res, err := tx.Exec(loginQuery, login["newHexEncrypted"], login["name"], vaultUuid)
+			res, err := tx.Exec(loginQuery, login["new_hex_cipher"], login["new_hex_salt"], login["name"], vaultUuid)
 			if err != nil {
 				log.Printf("failed to update passwords associated with the vault: %s", err)
 				return nil, StorageUpdateError{}
@@ -187,8 +189,8 @@ func (s *Storage) UpdateVault(vaultUuid, newName, newDescription, newMasterPassH
 		args = append(args, newDescription)
 	}
 	if len(loginList) > 0 {
-		setClause = append(setClause, " hex_hashed_master_password = ?")
-		args = append(args, newMasterPassHashedHex)
+		setClause = append(setClause, " hex_cipher = ?")
+		args = append(args, newVaultHexcipher)
 	}
 	vaultQuery += strings.Join(setClause, ",")
 	vaultQuery += whereClause
@@ -218,7 +220,7 @@ func (s *Storage) UpdateVault(vaultUuid, newName, newDescription, newMasterPassH
 }
 
 func (s *Storage) ReadLogins(vault_uuid string) ([]map[string]string, error) {
-	query := `SELECT identifier, name, username, hex_encrypted_password, hex_salt FROM passwords WHERE vault_uuid = ?`
+	query := `SELECT identifier, name, username, hex_cipher, hex_salt FROM passwords WHERE vault_uuid = ?`
 	rows, err := s.db.Query(query, vault_uuid)
 	if err != nil {
 		log.Printf("failed to query database for logins associated with vauld uuid %s. err: %s", vault_uuid, err)
@@ -228,13 +230,13 @@ func (s *Storage) ReadLogins(vault_uuid string) ([]map[string]string, error) {
 
 	var loginList []map[string]string
 	for rows.Next() {
-		var identifier, name, username, hexEncryptedPassword, hexSalt string
-		err := rows.Scan(&identifier, &name, &username, &hexEncryptedPassword, &hexSalt)
+		var identifier, name, username, hexcipher, hexSalt string
+		err := rows.Scan(&identifier, &name, &username, &hexcipher, &hexSalt)
 		if err != nil {
 			log.Printf("error while scanning results of query. err: %s", err)
 			return nil, StorageReadError{}
 		}
-		loginList = append(loginList, map[string]string{"identifier": identifier, "name": name, "username": username, "hex_enc_pass": hexEncryptedPassword, "hex_salt": hexSalt})
+		loginList = append(loginList, map[string]string{"identifier": identifier, "name": name, "username": username, "hex_cipher": hexcipher, "hex_salt": hexSalt})
 	}
 	return loginList, nil
 }
@@ -294,10 +296,10 @@ func (s *Storage) DeleteVault(name, vault_uuid string) (map[string]int64, error)
 	return map[string]int64{"delete_login": affectedLogin, "delete_vault": affectedVault}, nil
 }
 
-func (s *Storage) SaveLogin(vaultUuid, name, username, hexEncryptedPassword, hex_salt string) (int64, error) {
+func (s *Storage) SaveLogin(vaultUuid, name, username, hexcipher, hex_salt string) (int64, error) {
 	identifier := vaultUuid + "_" + name
-	query := `INSERT INTO passwords (vault_uuid, identifier, name, username, hex_encrypted_password, hex_salt) VALUES (?, ?, ?, ?, ?, ?)`
-	result, err := s.db.Exec(query, vaultUuid, identifier, name, username, hexEncryptedPassword, hex_salt)
+	query := `INSERT INTO passwords (vault_uuid, identifier, name, username, hex_cipher, hex_salt) VALUES (?, ?, ?, ?, ?, ?)`
+	result, err := s.db.Exec(query, vaultUuid, identifier, name, username, hexcipher, hex_salt)
 	if err != nil {
 		log.Printf("failed to add new login %s to vault %s. err: %s", name, vaultUuid, err)
 		return 0, StorageUpdateError{}
@@ -306,21 +308,21 @@ func (s *Storage) SaveLogin(vaultUuid, name, username, hexEncryptedPassword, hex
 }
 
 func (s *Storage) ReadLogin(vault_uuid, name string) (map[string]string, error) {
-	query := `SELECT username, hex_encrypted_password, hex_salt FROM passwords WHERE name = ? AND vault_uuid = ?`
+	query := `SELECT username, hex_cipher, hex_salt FROM passwords WHERE name = ? AND vault_uuid = ?`
 	row := s.db.QueryRow(query, name, vault_uuid)
 
-	var username, hexEncryptedPassword, hexSalt string
-	err := row.Scan(&username, &hexEncryptedPassword, &hexSalt)
+	var username, hexcipher, hexSalt string
+	err := row.Scan(&username, &hexcipher, &hexSalt)
 	if err != nil {
 		log.Printf("error while scanning results of query. err: %s", err)
 		return nil, StorageReadError{}
 	}
 
 	return map[string]string{
-		"name":                   name,
-		"username":               username,
-		"hex_encrypted_password": hexEncryptedPassword,
-		"hex_salt":               hexSalt,
+		"name":       name,
+		"username":   username,
+		"hex_cipher": hexcipher,
+		"hex_salt":   hexSalt,
 	}, nil
 }
 
@@ -375,7 +377,7 @@ func (s *Storage) ListLogin(vault_uuid, name, username string) ([]map[string]str
 	return loginList, nil
 }
 
-func (s *Storage) UpdateLogin(vaultUuid, target, name, username, hexEncryptedPassword, hexSalt string) (int64, error) {
+func (s *Storage) UpdateLogin(vaultUuid, target, name, username, hexcipher, hexSalt string) (int64, error) {
 	var args []interface{}
 	query := `UPDATE passwords SET`
 	whereClause := " WHERE name = ? AND vault_uuid = ?"
@@ -390,9 +392,9 @@ func (s *Storage) UpdateLogin(vaultUuid, target, name, username, hexEncryptedPas
 		setClause = append(setClause, " username = ?")
 		args = append(args, username)
 	}
-	if hexEncryptedPassword != "" {
-		setClause = append(setClause, " hex_encrypted_password = ?")
-		args = append(args, hexEncryptedPassword)
+	if hexcipher != "" {
+		setClause = append(setClause, " hex_cipher = ?")
+		args = append(args, hexcipher)
 		setClause = append(setClause, " hex_salt = ?")
 		args = append(args, hexSalt)
 	}

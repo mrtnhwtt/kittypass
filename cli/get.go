@@ -21,7 +21,7 @@ func NewGetCmd(conf *viper.Viper) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "get",
-		Aliases: []string{"fetch", "copy"},
+		Aliases: []string{"fetch", "copy", "get login"},
 		Short:   "get a login",
 		Long:    "get a login from a vault, adds the password to the clipboard",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -57,7 +57,7 @@ func NewGetCmd(conf *viper.Viper) *cobra.Command {
 				return err
 			}
 			fmt.Printf("\n%s%s\n", blue("Login Name: "), login["name"])
-			fmt.Printf("%s%s\n", blue("Usename: "), login["username"])
+			fmt.Printf("%s%s\n", blue("Username: "), login["username"])
 			err = utils.AddToClipboard(login["password"])
 			if err != nil {
 				fmt.Printf("%s%s\n", blue("Password: "), login["password"])

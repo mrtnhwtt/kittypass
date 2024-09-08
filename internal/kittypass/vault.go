@@ -10,8 +10,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// TODO: vault struct should hold the connection to the database
-// TODO: vault struct should hold the encryption algorithm used for that vault
 type Vault struct {
 	Uuid              string
 	Name              string
@@ -61,8 +59,8 @@ func (v *Vault) HashMasterpass() error {
 func (v *Vault) MasterpassMatch() error {
 	storedPass, err := hex.DecodeString(v.HexHashMasterpass)
 	if err != nil {
-		log.Printf("error when decoding stored hex hashed password: %s", err)
-		return MalformedDataError{"hex hashed password"}
+		log.Printf("error when decoding stored hex cipher: %s", err)
+		return MalformedDataError{"hex cipher"}
 	}
 	// check the stored master password against the provided master password
 	if err = bcrypt.CompareHashAndPassword(storedPass, []byte(v.Masterpass)); err != nil {
@@ -78,7 +76,7 @@ func (v *Vault) Get() error {
 	}
 	v.Uuid = vaultData["uuid"]
 	v.Description = vaultData["description"]
-	v.HexHashMasterpass = vaultData["hex_hashed_master_password"]
+	v.HexHashMasterpass = vaultData["hex_cipher"]
 	return nil
 }
 
@@ -125,7 +123,7 @@ func (v *Vault) reencryptLogins(newMasterPass string) ([]map[string]string, erro
 		login.HexSalt = loginData["hex_salt"]
 		login.Vault = v
 		login.RecreateDerivationKey()
-		loginData["decrypted"], err = e.Decrypt(login.DerivationKey, loginData["hex_enc_pass"])
+		loginData["decrypted"], err = e.Decrypt(login.DerivationKey, loginData["hex_cipher"])
 		if err != nil {
 			return nil, err
 		}
@@ -141,11 +139,11 @@ func (v *Vault) reencryptLogins(newMasterPass string) ([]map[string]string, erro
 		login = NewLogin()
 		login.Vault = v
 		login.UseMasterPassword()
-		loginData["newHexEncrypted"], err = e.Encrypt(login.DerivationKey, loginData["decrypted"])
+		loginData["new_hex_cipher"], err = e.Encrypt(login.DerivationKey, loginData["decrypted"])
 		if err != nil {
 			return nil, err
 		}
-		loginData["hex_salt"] = login.HexSalt
+		loginData["new_hex_salt"] = login.HexSalt
 		delete(loginData, "decrypted")
 	}
 	return loginList, nil
