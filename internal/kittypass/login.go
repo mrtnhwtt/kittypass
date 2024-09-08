@@ -25,12 +25,6 @@ func NewLogin() Login {
 	}
 }
 
-// Create an hex of the salt and encrypted password
-func (l *Login) PrepareHex() {}
-
-// retrieve the salt and cipher from stored hex
-func (l *Login) ReadHex() {}
-
 // UseMasterPassword generate a DerivationKey from a master password to use to encrypt and decrypt passwords stored in kittypass
 func (l *Login) UseMasterPassword() error {
 	var err error
