@@ -69,10 +69,8 @@ AES is used to encrypt your passwords before being stored in SQLite in hexadecim
 
 Planned Features:
 
-- [ ] Instead of a unique salt per Vault, implement unique salt per Login.
 - [ ] Develop a TUI
-- [x] Integrate Viper for configuration management, allowing users to customize storage and logs location.
-- [ ] Add support for other storage methods beyond SQLite
+- [ ] Add support for other storage methods
 - [ ] Add support for other encryption algorithms
 
 ## License
