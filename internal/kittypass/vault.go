@@ -17,6 +17,7 @@ type Vault struct {
 	Masterpass        string
 	HexHashMasterpass string
 	Db                *storage.Storage
+	DateCreated       string
 }
 
 func NewVault() Vault {

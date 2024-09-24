@@ -3,6 +3,8 @@ package cli
 import (
 	"github.com/fatih/color"
 	"github.com/mrtnhwtt/kittypass/internal/config"
+	"github.com/mrtnhwtt/kittypass/tui"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -26,7 +28,14 @@ func NewRootCmd(conf *viper.Viper) *cobra.Command {
 			config.BindFlags(cmd, conf)
 		},
 		// TODO: TUI implementation here. Calling a subcommand won't launch the TUI, they will always be imperative
-		// RunE: func(cmd *cobra.Command, args []string) error { return nil },
+		RunE: func(cmd *cobra.Command, args []string) error {
+			bm := tui.NewBoard(conf)
+			p := tea.NewProgram(bm, tea.WithAltScreen())
+			if _, err := p.Run(); err != nil {
+				return err
+			}
+			return nil
+		},
 	}
 
 	cmd.AddCommand(
